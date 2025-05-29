@@ -79,12 +79,12 @@ int main ( int argc , char ** argv ){
 	clock_gettime(CLOCK_MONOTONIC, &t_Compl);
 
 	// calculate the execution time dt_exec
-    dt_exec = diff_time(&t_Compl, &t_Start);
+    dt_exec = diff_time(&t_Start, &t_Compl);
 
 	// print the results
-    printf("Start-time      : %11ld s %9ld ns\n", t_Start.tv_sec,t_Start.tv_nsec);
-    printf("Completion-time : %11ld s %9ld ns\n", t_Compl.tv_sec,t_Compl.tv_nsec);
-    printf("Execution-time  : %11ld s %9ld ns\n", dt_exec.tv_sec,dt_exec.tv_nsec);
+    printf("Start-time      : %11ld s %9ld ns", t_Start.tv_sec,t_Start.tv_nsec);
+    printf("Completion-time : %11ld s %9ld ns", t_Compl.tv_sec,t_Compl.tv_nsec);
+    printf("Execution-time  : %11ld s %9ld ns", dt_exec.tv_sec,dt_exec.tv_nsec);
     return 0;
 }
 
