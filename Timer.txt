@@ -1,0 +1,96 @@
+Ich habe folgende Aufgabe in meinem Modul für Real Time Systems an der Hochschule:
+
+"Please follow the steps described as follows:
+copy the program interruptTimer.c from moodle to your working directory, compile it  and run it.
+Change the parameters to get familiar with the
+struct itimerval 
+to configure a time. Comment the line 
+signal (SIGALRM, interrupt_services_routine)
+uncomment the lines with sigaction. The command "signal" is deprecated and will be replaced by "sigaction". For more see the reference"
+Meine C Datei ist im Anhang.
+Ich habe bereits compiled und ausgeführt.
+Ich habe aber noch Schwierigkeiten den Ablauf des Programmes zu verstehen.
+Lass uns Stück für Stück durch die einzelnen parts des Programms gehen.
+
+Erstmal dieser Teil:
+"""  int cnt_tick = 0;     // counter for ticks (interrupt events)   struct timespec tP_0; // timer stamp for time zero point          
+// *********** Interrupt Service Routine to be called after timer interrupt ****************************   // * 
+
+Die Main fängt an, wir erstellen schonmal den int für die ticks.
+Dann erstellen wir eine Variable vom Typ timespec. Diese enthält sekunden und nanosekunden. Jetzt erstellen wir die funktion interrupt_service_routine() innerhalb der Main Funktion. (Warum eigentlich innerhalb?). 
+In der Methode interrupt_service_routine() erstellen wir eine neue timespec und speichern darin die aktuell festgehaltene Zeit. Dann kommt der print-Befehl. 
+Hierbei verstehe ich nicht ganz warum ich tP-0 abziehe von t_Start_isr für die Sekunden und dann die Nanosekunden von t_Start_isr dranhänge. 
+Wenn ich richtig verstanden habe soll die Methode bei jedem mal wenn der timer klingelt aufgerufen werden und einen tick hochzählen und die aktuelle Zeit printen.
+
+Jetzt kommt der setup part. Hier erstellen wir eine Variable vom Typ itimerval. Diese hat zwei attribute, einen Wert mit Sekunden und Mikrosekunden der sozusagen die Rate darstellt 
+und einen Wert mit Sekunden und Mikrosekunden der angibt wie lange nach dem ersten interrupt timer gewartet werden soll.
+Wenn ich richtig verstanden habe brauchen wir einen struct itimerval um dann später im Code einen Timer zu setzen.
+Als nächstes setzen wir den Alarm. Was genau aber macht diese Zeile und wie steht das im Zusammenhang mit dem Timer? 
+In der nächsten Zeile initialisieren und starten wir ja den Timer - weiß dann der timer welchen Alarm er wählen soll oder wie ist das?
+Anschließend halten wir die aktuelle Zeit fest und printen diese. Dabei verstehe ich nicht warum das hier gemacht wird. 
+Als letztes kommt die while-loop die einfach nur den Programm aufruf aufrecht erhält, so dass wir sehen können das trotzdem was passiert. 
+Hierzu erkläre mir nochmal was eigentlich im Hintergrund geschieht. Wo werden die Prints ausgeführt wenn nicht von meinem Programm?
+
+Claude:
+Die Interrupt Service Routine (ISR)
+cvoid interrupt_service_routine () {
+    struct timespec t_Start_isr;
+    clock_gettime(CLOCK_REALTIME, &t_Start_isr);
+    printf("\n>%10ld %9ld ns -   -     Tick%i", t_Start_isr.tv_sec - tP_0.tv_sec, t_Start_isr.tv_nsec, cnt_tick);
+    cnt_tick++;
+}
+Warum ist die Funktion in main() definiert?
+Das ist eine nested function (verschachtelte Funktion) - ein GCC-spezifisches Feature. Der Vorteil: Die ISR kann direkt auf lokale Variablen von main() zugreifen (cnt_tick, tP_0). Das ist praktisch, aber nicht Standard-C.
+Warum t_Start_isr.tv_sec - tP_0.tv_sec?
+Das ist eine relative Zeitdarstellung!
+
+tP_0 ist der "Nullpunkt" (Startzeit des Programms)
+t_Start_isr.tv_sec - tP_0.tv_sec = Sekunden seit Programmstart
+t_Start_isr.tv_nsec = Nanosekunden der aktuellen Zeit
+
+In deiner Ausgabe siehst du:
+
+>1750666447 812158429 ns - Das ist die absolute Startzeit
+>         1 312159628 ns - 1 Sekunde nach Start + Nanosekunden
+
+Der Timer-Mechanismus
+csignal(SIGALRM, interrupt_service_routine);  // Alarm-Handler registrieren
+setitimer(ITIMER_REAL, &itval, NULL);        // Timer starten
+So funktioniert das zusammen:
+
+signal(SIGALRM, interrupt_service_routine) registriert deine Funktion als Signal-Handler
+setitimer() startet einen Hardware-Timer im Betriebssystem
+Wenn der Timer abläuft, sendet das OS ein SIGALRM-Signal an dein Programm
+Das OS unterbricht dein Programm und ruft automatisch interrupt_service_routine() auf
+
+Was passiert im Hintergrund?
+cwhile (cnt_tick < NUM_SLICES) {};  // Hauptprogramm wartet
+Das ist der Schlüssel! Während dein Hauptprogramm in der leeren While-Schleife "wartet":
+
+Timer läuft im Hintergrund (alle 100ms = 100.000 Mikrosekunden)
+Betriebssystem unterbricht dein Programm periodisch
+ISR wird ausgeführt → printf(), cnt_tick++
+Programm kehrt zur While-Schleife zurück
+Wiederholt sich bis cnt_tick >= 100
+
+Deine Ausgabe erklärt:
+>1750666447 812158429 ns -   -     Tick0  ← Programmstart
+>         1 312159628 ns -   -     Tick0  ← Nach 500ms (DT_WAIT_US)
+>         1 412159928 ns -   -     Tick1  ← +100ms später
+>         1 512159228 ns -   -     Tick2  ← +100ms später
+...
+
+Erste Zeile: Absolute Startzeit (tP_0)
+Zweite Zeile: Erster Interrupt nach 500ms Wartezeit
+Weitere Zeilen: Alle 100ms ein neuer Interrupt
+
+Zusammenfassung:
+Das Programm nutzt asynchrone Interrupts:
+
+Dein Hauptprogramm läuft
+Parallel dazu läuft ein Timer
+Bei jedem Timer-Event unterbricht das OS dein Programm
+Die ISR wird ausgeführt (printf + Zähler)
+Danach läuft dein Hauptprogramm weiter
+
+Das ist ein klassisches Real-Time System Beispiel - präzise Timing durch Hardware-Timer!
