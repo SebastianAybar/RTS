@@ -33,6 +33,8 @@ void buttonPressed() {
 }
 
 void setup() {
+
+  Serial.begin(9600);
   // Erst mal alle LED'S initialisieren
   for (int i = 0; i < numLedPins; i++) {
     pinMode(ledPins[i], OUTPUT);
@@ -102,6 +104,11 @@ void loop() {
   // Prüfen ob der Modus geändert wurde
   if (modeChanged) {
     modeChanged = false;  // Mode zurücksetzen
+    if (runningMode) {
+      Serial.println("running ...");
+    } else {
+      Serial.println("idle ...");
+    }
     
     if (!runningMode) {
       // Wenn gestoppt, alle LEDs ausschalten außer den äußeren
